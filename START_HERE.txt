@@ -1,0 +1,105 @@
+═══════════════════════════════════════════════════════
+    🚀 START HERE - DEPLOY YOUR DASHBOARD IN 10 MINUTES
+═══════════════════════════════════════════════════════
+
+Everything is prepared! Follow these simple steps:
+
+┌─────────────────────────────────────────────────────┐
+│  STEP 1: Install Git (if not installed)            │
+└─────────────────────────────────────────────────────┘
+
+Download: https://git-scm.com/download/win
+Install with default settings, then restart Command Prompt
+
+
+┌─────────────────────────────────────────────────────┐
+│  STEP 2: Double-click "deploy-setup.bat"           │
+└─────────────────────────────────────────────────────┘
+
+This will initialize Git and prepare your code.
+
+
+┌─────────────────────────────────────────────────────┐
+│  STEP 3: Create GitHub Account & Repository        │
+└─────────────────────────────────────────────────────┘
+
+Option A (Easier): Use GitHub Desktop
+  1. Download: https://desktop.github.com/
+  2. Sign in/create account
+  3. Add your project folder
+  4. ⚠️ CHECK "Keep this code PRIVATE"
+  5. Click "Publish Repository"
+
+Option B: Command Line (see DEPLOYMENT_GUIDE.md)
+
+
+┌─────────────────────────────────────────────────────┐
+│  STEP 4: Deploy to Vercel                          │
+└─────────────────────────────────────────────────────┘
+
+1. Go to: https://vercel.com
+2. Click "Sign Up" → "Continue with GitHub"
+3. Click "Import Project"
+4. Select your "pe-dashboard" repository
+5. ⚠️ BEFORE DEPLOYING: Add Environment Variables!
+
+
+┌─────────────────────────────────────────────────────┐
+│  STEP 5: Add Environment Variables (IMPORTANT!)    │
+└─────────────────────────────────────────────────────┘
+
+In Vercel project settings → Environment Variables, add:
+
+Name: FEISHU_APP_ID
+Value: cli_aab0f4727cb9dcdc
+
+Name: FEISHU_APP_SECRET  
+Value: i5nLWkbOGdAMZNmwdQ3U6gvoW83r1IpU
+
+Name: SYNC_INTERVAL
+Value: 1
+
+Name: FEISHU_BITABLE_IDS
+Value: KshewAyAuiGsChkp4GOcMCIcnje
+
+(For each variable, check: Production, Preview, Development)
+
+
+┌─────────────────────────────────────────────────────┐
+│  STEP 6: Deploy!                                   │
+└─────────────────────────────────────────────────────┘
+
+Click "Deploy" button and wait 2-5 minutes.
+You'll get a URL like: https://pe-dashboard-xxx.vercel.app
+
+
+═══════════════════════════════════════════════════════
+
+📚 NEED MORE DETAILS?
+
+- DEPLOYMENT_CHECKLIST.txt - Simple checkbox list
+- DEPLOYMENT_GUIDE.md - Full detailed guide with screenshots
+
+═══════════════════════════════════════════════════════
+
+✅ WHAT'S BEEN PREPARED FOR YOU:
+
+✓ vercel.json - Deployment configuration
+✓ api/index.js - Serverless backend
+✓ Updated package.json with build commands
+✓ All files ready to deploy
+
+═══════════════════════════════════════════════════════
+
+🔒 SECURITY:
+
+✓ Your .env file won't be uploaded (protected by .gitignore)
+✓ Make sure GitHub repo is PRIVATE
+✓ Environment variables are encrypted in Vercel
+✓ Only people with the URL can access
+
+═══════════════════════════════════════════════════════
+
+❓ Questions? Stuck on a step? Let me know!
+
+═══════════════════════════════════════════════════════

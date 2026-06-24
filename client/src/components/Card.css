@@ -1,0 +1,235 @@
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-bottom: 1px solid #f0f0f0;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+}
+
+.card-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.card-title-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 0.25rem 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-type {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.card-content {
+  padding: 1.5rem;
+  flex: 1;
+}
+
+/* Document Card */
+.content-preview {
+  color: #555;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Sheet Card */
+.sheet-stats {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.sheet-preview {
+  margin-bottom: 1.5rem;
+}
+
+.sheet-preview:last-child {
+  margin-bottom: 0;
+}
+
+.sheet-name {
+  font-size: 1rem;
+  color: #667eea;
+  margin: 0 0 0.75rem 0;
+  font-weight: 600;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  margin-bottom: 0.5rem;
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.preview-table th {
+  background: #f8f9fa;
+  padding: 0.5rem;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  white-space: nowrap;
+}
+
+.preview-table td {
+  padding: 0.5rem;
+  border: 1px solid #e0e0e0;
+  color: #555;
+}
+
+.preview-table tr:hover {
+  background: #f8f9fa;
+}
+
+.no-data {
+  color: #999;
+  font-style: italic;
+  margin: 0;
+}
+
+.more-rows,
+.more-sheets {
+  color: #888;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0 0;
+  font-style: italic;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: #f8f9fa;
+  border-top: 1px solid #f0f0f0;
+}
+
+.update-time {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.doc-id {
+  font-size: 0.75rem;
+  color: #999;
+  font-family: 'Courier New', monospace;
+}
+
+/* Card Type Specific */
+.document-card {
+  border-top: 4px solid #667eea;
+}
+
+.sheet-card {
+  border-top: 4px solid #48bb78;
+}
+
+.wiki-card {
+  border-top: 4px solid #f6ad55;
+}
+
+.bitable-card {
+  border-top: 4px solid #9f7aea;
+}
+
+/* Wiki Card */
+.wiki-type {
+  color: #888;
+  font-size: 0.85rem;
+  margin-top: 1rem;
+  font-style: italic;
+}
+
+/* Bitable Card */
+.bitable-info {
+  color: #555;
+}
+
+.table-count {
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+}
+
+.tables-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.table-item {
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 3px solid #9f7aea;
+}
+
+.table-item strong {
+  display: block;
+  color: #333;
+  margin-bottom: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.record-count {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.more-info {
+  color: #888;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0 0;
+  font-style: italic;
+}
+
+.last-updated {
+  font-size: 0.85rem;
+  color: #666;
+}

@@ -112,12 +112,29 @@ app.get('/api/pe-stats', async (req, res) => {
     // Get access token for fetching user avatars
     const token = await feishuApi.getAccessToken();
     
-    // Define difficulty level weights for workload calculation
+    // Get user-adjustable weights from query params (with defaults)
     const difficultyWeights = {
-      '简单': 1,
-      '中等': 2,
-      '困难': 3,
-      '非常困难': 4
+      '高难项目': parseFloat(req.query.difficultWeight || 3),
+      '中等项目': parseFloat(req.query.mediumWeight || 2),
+      '简单项目': parseFloat(req.query.easyWeight || 1),
+      // Fallback for other naming conventions
+      '困难': parseFloat(req.query.difficultWeight || 3),
+      '中等': parseFloat(req.query.mediumWeight || 2),
+      '简单': parseFloat(req.query.easyWeight || 1),
+      '非常困难': parseFloat(req.query.difficultWeight || 3)
+    };
+    
+    // Customer status workload multipliers
+    const statusMultipliers = {
+      '维护中': parseFloat(req.query.maintainMultiplier || 1.0),
+      '调优中': parseFloat(req.query.optimizeMultiplier || 1.5),
+      '搭建中': parseFloat(req.query.buildMultiplier || 1.5),
+      '测试中': parseFloat(req.query.testMultiplier || 1.0),
+      '等待中（等商务）': parseFloat(req.query.waitBusinessMultiplier || 0.3),
+      '等待中（等客户）': parseFloat(req.query.waitClientMultiplier || 0.3),
+      '未知状态': parseFloat(req.query.unknownMultiplier || 0.5),
+      '封号': parseFloat(req.query.bannedMultiplier || 0.1),
+      '已流失': parseFloat(req.query.lostMultiplier || 0.1)
     };
     
     // Process all bitables
@@ -131,9 +148,20 @@ app.get('/api/pe-stats', async (req, res) => {
           const projectName = fields['项目名称'] || fields['项目'] || '未命名项目';
           const customerStatus = fields['客户状态'] || '未知状态';
           
+          // Skip inactive projects (封号 and 已流失)
+          if (customerStatus === '封号' || customerStatus === '已流失') {
+            return; // Skip this project
+          }
+          
           // Get project difficulty level
-          const difficultyLevel = fields['项目难度等级'] || '中等';
-          const difficultyWeight = difficultyWeights[difficultyLevel] || 2;
+          const difficultyLevel = fields['项目难度等级'] || '中等项目';
+          const difficultyWeight = difficultyWeights[difficultyLevel] || difficultyWeights['中等项目'] || 2;
+          
+          // Get status multiplier
+          const statusMultiplier = statusMultipliers[customerStatus] || 1.0;
+          
+          // Calculate weighted workload: difficulty × status multiplier
+          const projectWorkload = difficultyWeight * statusMultiplier;
           
           // Count customer status
           if (!statusStats[customerStatus]) {
@@ -152,19 +180,23 @@ app.get('/api/pe-stats', async (req, res) => {
                 id: pe.id || '',
                 avatar: null,  // Will be fetched below
                 projectCount: 0,
-                workload: 0,  // Total workload score
+                workload: 0,  // Total weighted workload score
+                rawWorkload: 0,  // Raw difficulty sum (for reference)
                 projects: [],
                 statusBreakdown: {}
               };
             }
             
             peStats[peName].projectCount++;
-            peStats[peName].workload += difficultyWeight;
+            peStats[peName].workload += projectWorkload;
+            peStats[peName].rawWorkload += difficultyWeight;
             peStats[peName].projects.push({
               name: projectName,
               status: customerStatus,
               difficulty: difficultyLevel,
               difficultyWeight: difficultyWeight,
+              statusMultiplier: statusMultiplier,
+              projectWorkload: projectWorkload,
               recordId: record.record_id
             });
             
@@ -210,9 +242,18 @@ app.get('/api/pe-stats', async (req, res) => {
       totalPEs: statsArray.length,
       totalProjects: statsArray.reduce((sum, pe) => sum + pe.projectCount, 0),
       totalWorkload: statsArray.reduce((sum, pe) => sum + pe.workload, 0),
+      totalRawWorkload: statsArray.reduce((sum, pe) => sum + pe.rawWorkload, 0),
       peStats: statsArray,
       statusStats: statusArray,
-      lastSync: dataStore.lastSync
+      lastSync: dataStore.lastSync,
+      appliedWeights: {
+        difficulty: {
+          '高难项目': difficultyWeights['高难项目'],
+          '中等项目': difficultyWeights['中等项目'],
+          '简单项目': difficultyWeights['简单项目']
+        },
+        statusMultipliers: statusMultipliers
+      }
     });
   } catch (error) {
     console.error('Error generating PE stats:', error);

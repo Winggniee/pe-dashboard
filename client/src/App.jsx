@@ -19,10 +19,38 @@ const STATUS_ORDER = [
   '测试中',
   '等待中（等商务）',
   '等待中（等客户）',
-  '未知状态',
-  '封号',
-  '已流失'
+  '未知状态'
 ];
+
+// Define PE availability categories based on their project statuses
+const getAvailabilityCategory = (pe) => {
+  const breakdown = pe.statusBreakdown || {};
+  
+  // Count high-intensity work projects
+  const optimizeCount = breakdown['调优中'] || 0;
+  const buildCount = breakdown['搭建中'] || 0;
+  const testCount = breakdown['测试中'] || 0;
+  const maintainCount = breakdown['维护中'] || 0;
+  
+  // 🔴 深度工作 (Red) - Criteria:
+  // - >2 projects in 调优中 OR
+  // - >2 projects in 搭建中 OR
+  // - >10 projects in 维护中 OR
+  // - Any combination of 测试中 with 调优中/搭建中 that totals >2
+  const highIntensityCount = optimizeCount + buildCount + testCount;
+  
+  if (optimizeCount > 2 || buildCount > 2 || maintainCount > 10 || highIntensityCount > 2) {
+    return 'busy';
+  }
+  
+  // 🟡 半阻塞 (Yellow) - Has projects in 等待中（等客户）
+  if ((breakdown['等待中（等客户）'] || 0) > 0) {
+    return 'semi-blocked';
+  }
+  
+  // 🟢 空闲 (Green) - Everything else
+  return 'available';
+};
 
 function App() {
   const [peStats, setPeStats] = useState([]);
@@ -32,12 +60,38 @@ function App() {
   const [totalPEs, setTotalPEs] = useState(0);
   const [totalProjects, setTotalProjects] = useState(0);
   const [totalWorkload, setTotalWorkload] = useState(0);
+  const [capacityDistribution, setCapacityDistribution] = useState({
+    busy: 0,
+    semiBlocked: 0,
+    available: 0,
+    busyPEs: [],
+    semiBlockedPEs: [],
+    availablePEs: []
+  });
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
   const [error, setError] = useState(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [sortBy, setSortBy] = useState('total'); // 'total' or specific status name
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedCapacity, setSelectedCapacity] = useState(null); // 'busy', 'semi-blocked', 'available', or null
+  
+  // Workload calculation weights (user adjustable)
+  const [weights, setWeights] = useState({
+    // Difficulty weights
+    difficultWeight: 3,
+    mediumWeight: 2,
+    easyWeight: 1,
+    // Status multipliers
+    maintainMultiplier: 1.0,
+    optimizeMultiplier: 1.5,
+    buildMultiplier: 1.5,
+    testMultiplier: 1.0,
+    waitBusinessMultiplier: 0.3,
+    waitClientMultiplier: 0.3,
+    unknownMultiplier: 0.5
+  });
 
   useEffect(() => {
     loadData();
@@ -65,7 +119,7 @@ function App() {
     setError(null);
     
     try {
-      const data = await api.getPEStats();
+      const data = await api.getPEStats(weights);
       const stats = data.peStats || [];
       
       setPeStats(stats);
@@ -73,6 +127,32 @@ function App() {
       setTotalProjects(data.totalProjects || 0);
       setTotalWorkload(data.totalWorkload || 0);
       setLastSync(data.lastSync);
+      
+      // Calculate capacity distribution
+      const capacityStats = {
+        busy: 0,
+        semiBlocked: 0,
+        available: 0,
+        busyPEs: [],
+        semiBlockedPEs: [],
+        availablePEs: []
+      };
+      
+      stats.forEach(pe => {
+        const category = getAvailabilityCategory(pe);
+        if (category === 'busy') {
+          capacityStats.busy++;
+          capacityStats.busyPEs.push(pe.name);
+        } else if (category === 'semi-blocked') {
+          capacityStats.semiBlocked++;
+          capacityStats.semiBlockedPEs.push(pe.name);
+        } else {
+          capacityStats.available++;
+          capacityStats.availablePEs.push(pe.name);
+        }
+      });
+      
+      setCapacityDistribution(capacityStats);
       
       // Get all unique statuses across all PEs
       const statusSet = new Set();
@@ -106,6 +186,8 @@ function App() {
       const sortedStats = [...stats].sort((a, b) => {
         if (sortBy === 'total') {
           return b.projectCount - a.projectCount;
+        } else if (sortBy === 'workload') {
+          return b.workload - a.workload;
         } else {
           const countA = a.statusBreakdown[sortBy] || 0;
           const countB = b.statusBreakdown[sortBy] || 0;
@@ -116,7 +198,8 @@ function App() {
       const chartDataArray = sortedStats.map(pe => {
         const dataPoint = {
           name: pe.name,
-          total: pe.projectCount
+          total: pe.projectCount,
+          workload: pe.workload  // Add workload for display
         };
         
         // Always use consistent order
@@ -171,6 +254,8 @@ function App() {
       const sortedStats = [...peStats].sort((a, b) => {
         if (sortBy === 'total') {
           return b.projectCount - a.projectCount;
+        } else if (sortBy === 'workload') {
+          return b.workload - a.workload;
         } else {
           const countA = a.statusBreakdown[sortBy] || 0;
           const countB = b.statusBreakdown[sortBy] || 0;
@@ -182,7 +267,8 @@ function App() {
       const chartDataArray = sortedStats.map(pe => {
         const dataPoint = {
           name: pe.name,
-          total: pe.projectCount
+          total: pe.projectCount,
+          workload: pe.workload  // Add workload for display
         };
         
         allStatuses.forEach(status => {
@@ -203,92 +289,53 @@ function App() {
       const peData = peStats.find(pe => pe.name === label);
       if (!peData) return null;
       
-      // If a specific status is selected, show only projects in that status
-      if (sortBy !== 'total') {
-        const projectsInSelectedStatus = peData.projects.filter(
-          p => p.status === sortBy
-        ) || [];
-        
-        const count = peData.statusBreakdown[sortBy] || 0;
-        
-        return (
-          <div className="custom-tooltip">
-            <p className="tooltip-label">{label}</p>
-            <p style={{ 
-              color: STATUS_COLORS[sortBy], 
-              fontWeight: 700,
-              fontSize: '1.1rem',
-              marginBottom: '0.5rem'
-            }}>
-              {sortBy}: {count} 个项目
-            </p>
-            {projectsInSelectedStatus.length > 0 && (
-              <div className="tooltip-projects">
-                <div className="tooltip-projects-title">项目列表:</div>
-                {projectsInSelectedStatus.slice(0, 8).map((project, idx) => (
-                  <div key={idx} className="tooltip-project-item">
-                    {project.name}
-                  </div>
-                ))}
-                {projectsInSelectedStatus.length > 8 && (
-                  <div className="tooltip-project-item" style={{ fontStyle: 'italic', color: '#8b8c89' }}>
-                    ... 还有 {projectsInSelectedStatus.length - 8} 个项目
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      }
+      // Filter only 高难项目
+      const highDifficultyProjects = peData.projects.filter(
+        p => p.difficulty === '高难项目'
+      ) || [];
       
-      // If "总项目数" is selected, show all projects with their statuses
       return (
         <div className="custom-tooltip">
           <p className="tooltip-label">{label}</p>
-          <p className="tooltip-total" style={{ 
-            fontWeight: 800,
+          <p style={{ 
+            fontWeight: 700,
             color: '#274c77',
             fontSize: '1.1rem',
             marginBottom: '0.5rem'
           }}>
-            总项目数: {peData.projectCount} 个
+            工作负载: {peData.workload.toFixed(1)}
           </p>
-          <div className="tooltip-projects">
-            <div className="tooltip-projects-title">按状态分布:</div>
-            {Object.entries(peData.statusBreakdown || {})
-              .filter(([_, count]) => count > 0)
-              .sort((a, b) => {
-                const indexA = STATUS_ORDER.indexOf(a[0]);
-                const indexB = STATUS_ORDER.indexOf(b[0]);
-                const orderA = indexA === -1 ? 999 : indexA;
-                const orderB = indexB === -1 ? 999 : indexB;
-                return orderA - orderB;
-              })
-              .map(([status, count]) => (
-                <div key={status} className="tooltip-project-item" style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
+          {highDifficultyProjects.length > 0 && (
+            <div className="tooltip-projects">
+              <div className="tooltip-projects-title" style={{ color: '#a22c29' }}>
+                🔥 高难项目 ({highDifficultyProjects.length}个):
+              </div>
+              {highDifficultyProjects.slice(0, 8).map((project, idx) => (
+                <div key={idx} className="tooltip-project-item" style={{ color: '#a22c29' }}>
+                  {project.name}
                   <span style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '0.3rem' 
+                    marginLeft: '0.5rem',
+                    fontSize: '0.75rem',
+                    color: STATUS_COLORS[project.status] || '#8b8c89'
                   }}>
-                    <span style={{ 
-                      width: '8px', 
-                      height: '8px', 
-                      borderRadius: '50%', 
-                      backgroundColor: STATUS_COLORS[status],
-                      display: 'inline-block'
-                    }}></span>
-                    {status}
+                    ({project.status})
                   </span>
-                  <span style={{ fontWeight: 700, color: STATUS_COLORS[status] }}>{count}</span>
                 </div>
               ))}
-          </div>
+              {highDifficultyProjects.length > 8 && (
+                <div className="tooltip-project-item" style={{ fontStyle: 'italic', color: '#a22c29' }}>
+                  ... 还有 {highDifficultyProjects.length - 8} 个高难项目
+                </div>
+              )}
+            </div>
+          )}
+          {highDifficultyProjects.length === 0 && (
+            <div className="tooltip-projects">
+              <div className="tooltip-projects-title" style={{ color: '#8b8c89' }}>
+                该PE暂无高难项目
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -332,7 +379,7 @@ function App() {
           </div>
           <div className="stat-card">
             <div className="stat-label">总工作负载</div>
-            <div className="stat-value">{totalWorkload}</div>
+            <div className="stat-value">{totalWorkload.toFixed(1)}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">平均每人项目数</div>
@@ -369,6 +416,76 @@ function App() {
           <>
             {/* Main Bar Chart */}
             <div className="chart-section">
+              {/* Capacity Distribution Cards */}
+              <div className="capacity-distribution">
+                <h3 className="capacity-title">📊 团队人力分布</h3>
+                <div className="capacity-cards">
+                  <div 
+                    className={`capacity-card busy ${selectedCapacity === 'busy' ? 'active' : ''}`}
+                    onClick={() => setSelectedCapacity(selectedCapacity === 'busy' ? null : 'busy')}
+                  >
+                    <div className="capacity-icon">🔴</div>
+                    <div className="capacity-info">
+                      <div className="capacity-label">深度工作</div>
+                      <div className="capacity-count">{capacityDistribution.busy} 人</div>
+                      <div className="capacity-definition">
+                        &gt;2个调优/搭建 或 &gt;10个维护
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div 
+                    className={`capacity-card semi-blocked ${selectedCapacity === 'semi-blocked' ? 'active' : ''}`}
+                    onClick={() => setSelectedCapacity(selectedCapacity === 'semi-blocked' ? null : 'semi-blocked')}
+                  >
+                    <div className="capacity-icon">🟡</div>
+                    <div className="capacity-info">
+                      <div className="capacity-label">半阻塞</div>
+                      <div className="capacity-count">{capacityDistribution.semiBlocked} 人</div>
+                      <div className="capacity-definition">
+                        有等待客户反馈的项目
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div 
+                    className={`capacity-card available ${selectedCapacity === 'available' ? 'active' : ''}`}
+                    onClick={() => setSelectedCapacity(selectedCapacity === 'available' ? null : 'available')}
+                  >
+                    <div className="capacity-icon">🟢</div>
+                    <div className="capacity-info">
+                      <div className="capacity-label">空闲/商务阻塞</div>
+                      <div className="capacity-count">{capacityDistribution.available} 人</div>
+                      <div className="capacity-definition">
+                        可接收新项目
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Show PE names when a capacity is selected */}
+                {selectedCapacity && (
+                  <div className="selected-pes">
+                    <div className="selected-pes-header">
+                      {selectedCapacity === 'busy' && '🔴 深度工作中的PE：'}
+                      {selectedCapacity === 'semi-blocked' && '🟡 半阻塞的PE：'}
+                      {selectedCapacity === 'available' && '🟢 可分配的PE：'}
+                    </div>
+                    <div className="selected-pes-list">
+                      {selectedCapacity === 'busy' && capacityDistribution.busyPEs.map((name, idx) => (
+                        <span key={idx} className="pe-tag busy-tag">{name}</span>
+                      ))}
+                      {selectedCapacity === 'semi-blocked' && capacityDistribution.semiBlockedPEs.map((name, idx) => (
+                        <span key={idx} className="pe-tag semi-tag">{name}</span>
+                      ))}
+                      {selectedCapacity === 'available' && capacityDistribution.availablePEs.map((name, idx) => (
+                        <span key={idx} className="pe-tag available-tag">{name}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Sort Controls */}
               <div className="sort-controls">
                 <span className="sort-label">排序方式:</span>
@@ -378,6 +495,12 @@ function App() {
                     onClick={() => handleSortChange('total')}
                   >
                     总项目数
+                  </button>
+                  <button 
+                    className={`sort-btn ${sortBy === 'workload' ? 'active' : ''}`}
+                    onClick={() => handleSortChange('workload')}
+                  >
+                    工作负载
                   </button>
                   {allStatuses.map(status => (
                     <button 
@@ -486,19 +609,28 @@ function App() {
                                 // Only show label on the actual last segment
                                 if (index !== lastVisibleIndex) return null;
                                 
-                                const totalValue = dataPoint.total;
+                                // Determine which value to display based on sort mode
+                                let displayValue;
+                                if (sortBy === 'workload') {
+                                  displayValue = dataPoint.workload.toFixed(1);
+                                } else {
+                                  displayValue = dataPoint.total;
+                                }
                                 
-                                // Calculate fire emoji placement
+                                // Calculate fire emoji placement for workload sorting
                                 let isTopPE = false;
                                 if (sortBy === 'total') {
                                   const maxCount = Math.max(...chartData.map(d => d.total));
-                                  isTopPE = totalValue === maxCount;
+                                  isTopPE = dataPoint.total === maxCount && dataIndex === 0;
+                                } else if (sortBy === 'workload') {
+                                  // Find PE with highest workload
+                                  const maxWorkload = Math.max(...chartData.map(d => d.workload));
+                                  isTopPE = dataPoint.workload === maxWorkload && dataIndex === 0;
                                 } else {
                                   const statusCounts = chartData.map(d => d[sortBy] || 0);
                                   const maxCount = Math.max(...statusCounts);
                                   const currentCount = dataPoint[sortBy] || 0;
-                                  isTopPE = currentCount === maxCount && maxCount > 0 && 
-                                            statusCounts.indexOf(maxCount) === dataIndex;
+                                  isTopPE = currentCount === maxCount && maxCount > 0 && dataIndex === 0;
                                 }
                                 
                                 return (
@@ -511,7 +643,7 @@ function App() {
                                       dominantBaseline="middle"
                                       style={{ fontWeight: 'bold', fontSize: '14px' }}
                                     >
-                                      {totalValue}
+                                      {displayValue}
                                     </text>
                                     {isTopPE && (
                                       <text 
@@ -576,7 +708,7 @@ function App() {
                         <div>
                           <h3>{pe.name}</h3>
                           <p className="project-count-text">
-                            {pe.projectCount} 个项目 | 负载: {pe.workload}
+                            {pe.projectCount} 个项目 | 负载: {pe.workload.toFixed(1)}
                           </p>
                         </div>
                       </div>
@@ -659,6 +791,180 @@ function App() {
         >
           ↑
         </button>
+      )}
+
+      {/* Settings Button */}
+      <button 
+        className="settings-button"
+        onClick={() => setShowSettings(!showSettings)}
+        aria-label="负载权重设置"
+      >
+        ⚙️
+      </button>
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="settings-overlay" onClick={() => setShowSettings(false)}>
+          <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="settings-header">
+              <h3>⚙️ 工作负载权重设置</h3>
+              <button className="close-btn" onClick={() => setShowSettings(false)}>×</button>
+            </div>
+            
+            <div className="settings-content">
+              <div className="settings-section">
+                <h4>📊 项目难度权重</h4>
+                <div className="setting-item">
+                  <label>高难项目</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={weights.difficultWeight}
+                    onChange={(e) => setWeights({...weights, difficultWeight: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+                <div className="setting-item">
+                  <label>中等项目</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={weights.mediumWeight}
+                    onChange={(e) => setWeights({...weights, mediumWeight: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+                <div className="setting-item">
+                  <label>简单项目</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={weights.easyWeight}
+                    onChange={(e) => setWeights({...weights, easyWeight: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <h4>🔄 客户状态倍数</h4>
+                <div className="setting-item">
+                  <label>维护中</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={weights.maintainMultiplier}
+                    onChange={(e) => setWeights({...weights, maintainMultiplier: parseFloat(e.target.value) || 0})}
+                  />
+                  <span className="setting-hint">中等负载</span>
+                </div>
+                <div className="setting-item">
+                  <label>调优中</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={weights.optimizeMultiplier}
+                    onChange={(e) => setWeights({...weights, optimizeMultiplier: parseFloat(e.target.value) || 0})}
+                  />
+                  <span className="setting-hint">高负载</span>
+                </div>
+                <div className="setting-item">
+                  <label>搭建中</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={weights.buildMultiplier}
+                    onChange={(e) => setWeights({...weights, buildMultiplier: parseFloat(e.target.value) || 0})}
+                  />
+                  <span className="setting-hint">高负载</span>
+                </div>
+                <div className="setting-item">
+                  <label>测试中</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={weights.testMultiplier}
+                    onChange={(e) => setWeights({...weights, testMultiplier: parseFloat(e.target.value) || 0})}
+                  />
+                  <span className="setting-hint">中等负载</span>
+                </div>
+                <div className="setting-item">
+                  <label>等待中（等商务）</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={weights.waitBusinessMultiplier}
+                    onChange={(e) => setWeights({...weights, waitBusinessMultiplier: parseFloat(e.target.value) || 0})}
+                  />
+                  <span className="setting-hint">低负载</span>
+                </div>
+                <div className="setting-item">
+                  <label>等待中（等客户）</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={weights.waitClientMultiplier}
+                    onChange={(e) => setWeights({...weights, waitClientMultiplier: parseFloat(e.target.value) || 0})}
+                  />
+                  <span className="setting-hint">低负载</span>
+                </div>
+                <div className="setting-item">
+                  <label>未知状态</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={weights.unknownMultiplier}
+                    onChange={(e) => setWeights({...weights, unknownMultiplier: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-actions">
+                <button 
+                  className="reset-btn"
+                  onClick={() => {
+                    setWeights({
+                      difficultWeight: 3,
+                      mediumWeight: 2,
+                      easyWeight: 1,
+                      maintainMultiplier: 1.0,
+                      optimizeMultiplier: 1.5,
+                      buildMultiplier: 1.5,
+                      testMultiplier: 1.0,
+                      waitBusinessMultiplier: 0.3,
+                      waitClientMultiplier: 0.3,
+                      unknownMultiplier: 0.5
+                    });
+                  }}
+                >
+                  重置为默认值
+                </button>
+                <button 
+                  className="apply-btn"
+                  onClick={() => {
+                    setShowSettings(false);
+                    loadData(true);
+                  }}
+                >
+                  应用并重新计算
+                </button>
+              </div>
+
+              <div className="settings-explanation">
+                <p><strong>计算公式：</strong></p>
+                <p>项目负载 = 难度权重 × 状态倍数</p>
+                <p>PE总负载 = 所有项目负载之和</p>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

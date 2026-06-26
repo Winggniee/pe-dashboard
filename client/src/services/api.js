@@ -31,8 +31,11 @@ const api = {
     return response.json();
   },
 
-  async getPEStats() {
-    const response = await fetch(`${API_BASE}/pe-stats`);
+  async getPEStats(weights = {}) {
+    const params = new URLSearchParams(weights);
+    const queryString = params.toString();
+    const url = `${API_BASE}/pe-stats${queryString ? '?' + queryString : ''}`;
+    const response = await fetch(url);
     if (!response.ok) throw new Error('Failed to fetch PE statistics');
     return response.json();
   },

@@ -3,7 +3,7 @@ const cron = require('node-cron');
 let syncJob = null;
 
 function startAutoSync(syncFunction) {
-  const intervalMinutes = parseInt(process.env.SYNC_INTERVAL) || 5;
+  let intervalMinutes = parseInt(process.env.SYNC_INTERVAL) || 5;
   
   // Validate interval
   if (intervalMinutes < 1 || intervalMinutes > 1440) {

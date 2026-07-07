@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import './App.css';
 import api from './services/api';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 
 // Dynamic color assignment
 const STATUS_COLORS = {};
@@ -76,6 +76,23 @@ function App() {
   const [sortBy, setSortBy] = useState('total'); // 'total' or specific status name
   const [showSettings, setShowSettings] = useState(false);
   const [selectedCapacity, setSelectedCapacity] = useState(null); // 'busy', 'semi-blocked', 'available', or null
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('pe-dashboard-theme') === 'dark';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pe-dashboard-theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
+
+  // Theme-aware colors used for inline styles (chart text, tooltips, etc.)
+  const theme = {
+    text: darkMode ? '#eef0f4' : '#274c77',
+    danger: darkMode ? '#ff6b6b' : '#a22c29',
+    muted: darkMode ? '#6e7284' : '#8b8c89',
+    accent: darkMode ? '#61a8ff' : '#6096ba',
+    grid: darkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(39, 76, 119, 0.1)',
+    cursor: darkMode ? 'rgba(139, 124, 246, 0.08)' : 'rgba(163, 206, 241, 0.1)'
+  };
   
   // Workload calculation weights (user adjustable)
   const [weights, setWeights] = useState({
@@ -299,7 +316,7 @@ function App() {
           <p className="tooltip-label">{label}</p>
           <p style={{ 
             fontWeight: 700,
-            color: '#274c77',
+            color: theme.text,
             fontSize: '1.1rem',
             marginBottom: '0.5rem'
           }}>
@@ -307,23 +324,23 @@ function App() {
           </p>
           {highDifficultyProjects.length > 0 && (
             <div className="tooltip-projects">
-              <div className="tooltip-projects-title" style={{ color: '#a22c29' }}>
+              <div className="tooltip-projects-title" style={{ color: theme.danger }}>
                 🔥 高难项目 ({highDifficultyProjects.length}个):
               </div>
               {highDifficultyProjects.slice(0, 8).map((project, idx) => (
-                <div key={idx} className="tooltip-project-item" style={{ color: '#a22c29' }}>
+                <div key={idx} className="tooltip-project-item" style={{ color: theme.danger }}>
                   {project.name}
                   <span style={{ 
                     marginLeft: '0.5rem',
                     fontSize: '0.75rem',
-                    color: STATUS_COLORS[project.status] || '#8b8c89'
+                    color: STATUS_COLORS[project.status] || theme.muted
                   }}>
                     ({project.status})
                   </span>
                 </div>
               ))}
               {highDifficultyProjects.length > 8 && (
-                <div className="tooltip-project-item" style={{ fontStyle: 'italic', color: '#a22c29' }}>
+                <div className="tooltip-project-item" style={{ fontStyle: 'italic', color: theme.danger }}>
                   ... 还有 {highDifficultyProjects.length - 8} 个高难项目
                 </div>
               )}
@@ -331,7 +348,7 @@ function App() {
           )}
           {highDifficultyProjects.length === 0 && (
             <div className="tooltip-projects">
-              <div className="tooltip-projects-title" style={{ color: '#8b8c89' }}>
+              <div className="tooltip-projects-title" style={{ color: theme.muted }}>
                 该PE暂无高难项目
               </div>
             </div>
@@ -344,7 +361,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="app">
+      <div className={`app ${darkMode ? 'dark-theme' : ''}`}>
         <div className="loading">
           <div className="spinner"></div>
           <p>加载中...</p>
@@ -354,11 +371,23 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app ${darkMode ? 'dark-theme' : ''}`}>
       <header className="header">
         <div className="header-content">
           <h1>PE 项目统计看板</h1>
           <div className="header-actions">
+            <button 
+              className={`theme-switch ${darkMode ? 'is-dark' : ''}`}
+              onClick={() => setDarkMode(!darkMode)}
+              aria-label="切换深色模式"
+              title={darkMode ? '切换到浅色模式' : '切换到深色模式'}
+            >
+              <span className="theme-switch-track">
+                <span className="theme-switch-icon sun">☀️</span>
+                <span className="theme-switch-icon moon">🌙</span>
+                <span className="theme-switch-thumb"></span>
+              </span>
+            </button>
             <button 
               className={`sync-button ${syncing ? 'syncing' : ''}`}
               onClick={handleSync}
@@ -517,6 +546,19 @@ function App() {
                 </div>
               </div>
 
+              {/* Status legend as a horizontal strip above the chart */}
+              <div className="status-legend-bar">
+                {allStatuses.map(status => (
+                  <div key={status} className="legend-pill">
+                    <span 
+                      className="legend-pill-dot" 
+                      style={{ backgroundColor: STATUS_COLORS[status] }}
+                    ></span>
+                    <span className="legend-pill-label">{status}</span>
+                  </div>
+                ))}
+              </div>
+
               <div className="chart-legend-container">
                 <div className="chart-wrapper">
                   <ResponsiveContainer width="100%" height={Math.max(400, peStats.length * 60)}>
@@ -545,10 +587,10 @@ function App() {
                         }
                       }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(39, 76, 119, 0.1)" />
-                      <XAxis type="number" stroke="#274c77" />
-                      <YAxis dataKey="name" type="category" width={100} stroke="#274c77" />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(163, 206, 241, 0.1)' }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} />
+                      <XAxis type="number" stroke={theme.text} />
+                      <YAxis dataKey="name" type="category" width={100} stroke={theme.text} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: theme.cursor }} />
                       
                       {displayStatuses.map((status, index) => {
                         return (
@@ -638,7 +680,7 @@ function App() {
                                     <text 
                                       x={x + width + (isTopPE ? 28 : 8)} 
                                       y={y + height / 2} 
-                                      fill="#274c77" 
+                                      fill={theme.text} 
                                       textAnchor="start" 
                                       dominantBaseline="middle"
                                       style={{ fontWeight: 'bold', fontSize: '14px' }}
@@ -649,7 +691,7 @@ function App() {
                                       <text 
                                         x={x + width + 6} 
                                         y={y + height / 2 - 2} 
-                                        fill="#6096ba" 
+                                        fill={theme.accent} 
                                         textAnchor="start" 
                                         dominantBaseline="middle"
                                         style={{ fontSize: '18px' }}
@@ -668,28 +710,12 @@ function App() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-
-                {/* Legend on the right */}
-                <div className="legend-section">
-                  <h3>客户状态图例</h3>
-                  <div className="legend-items">
-                    {allStatuses.map(status => (
-                      <div key={status} className="legend-item">
-                        <span 
-                          className="legend-color" 
-                          style={{ backgroundColor: STATUS_COLORS[status] }}
-                        ></span>
-                        <span className="legend-label">{status}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
 
             {/* Detailed PE Cards */}
             <div className="pe-details-section">
-              <h2 style={{ color: '#274c77' }}>详细项目列表</h2>
+              <h2>详细项目列表</h2>
               <div className="pe-cards-grid">
                 {chartData.map((peData, index) => {
                   // Find the full PE data from peStats

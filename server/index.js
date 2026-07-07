@@ -13,9 +13,6 @@ app.use(express.json());
 
 // In-memory data store (consider using a database for production)
 let dataStore = {
-  documents: [],
-  sheets: [],
-  wikis: [],
   bitables: [],
   lastSync: null
 };
@@ -25,26 +22,8 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     lastSync: dataStore.lastSync,
-    documentsCount: dataStore.documents.length,
-    sheetsCount: dataStore.sheets.length,
-    wikisCount: dataStore.wikis.length,
     bitablesCount: dataStore.bitables.length
   });
-});
-
-// Get all documents
-app.get('/api/documents', (req, res) => {
-  res.json(dataStore.documents);
-});
-
-// Get all sheets
-app.get('/api/sheets', (req, res) => {
-  res.json(dataStore.sheets);
-});
-
-// Get all wikis
-app.get('/api/wikis', (req, res) => {
-  res.json(dataStore.wikis);
 });
 
 // Get all bitables
@@ -52,65 +31,11 @@ app.get('/api/bitables', (req, res) => {
   res.json(dataStore.bitables);
 });
 
-// Get single document by ID
-app.get('/api/documents/:id', (req, res) => {
-  const doc = dataStore.documents.find(d => d.id === req.params.id);
-  if (doc) {
-    res.json(doc);
-  } else {
-    res.status(404).json({ error: 'Document not found' });
-  }
-});
-
-// Get single sheet by ID
-app.get('/api/sheets/:id', (req, res) => {
-  const sheet = dataStore.sheets.find(s => s.id === req.params.id);
-  if (sheet) {
-    res.json(sheet);
-  } else {
-    res.status(404).json({ error: 'Sheet not found' });
-  }
-});
-
-// Get single wiki by ID
-app.get('/api/wikis/:id', (req, res) => {
-  const wiki = dataStore.wikis.find(w => w.id === req.params.id);
-  if (wiki) {
-    res.json(wiki);
-  } else {
-    res.status(404).json({ error: 'Wiki not found' });
-  }
-});
-
-// Get single bitable by ID
-app.get('/api/bitables/:id', (req, res) => {
-  const bitable = dataStore.bitables.find(b => b.id === req.params.id);
-  if (bitable) {
-    res.json(bitable);
-  } else {
-    res.status(404).json({ error: 'Bitable not found' });
-  }
-});
-
-// Debug endpoint to see raw data
-app.get('/api/debug/data', (req, res) => {
-  res.json({
-    documents: dataStore.documents,
-    sheets: dataStore.sheets,
-    wikis: dataStore.wikis,
-    bitables: dataStore.bitables,
-    lastSync: dataStore.lastSync
-  });
-});
-
 // PE Statistics endpoint
 app.get('/api/pe-stats', async (req, res) => {
   try {
     const peStats = {};
     const statusStats = {};
-    
-    // Get access token for fetching user avatars
-    const token = await feishuApi.getAccessToken();
     
     // Get user-adjustable weights from query params (with defaults)
     const difficultyWeights = {
@@ -178,10 +103,8 @@ app.get('/api/pe-stats', async (req, res) => {
                 name: peName,
                 email: pe.email || '',
                 id: pe.id || '',
-                avatar: null,  // Will be fetched below
                 projectCount: 0,
                 workload: 0,  // Total weighted workload score
-                rawWorkload: 0,  // Raw difficulty sum (for reference)
                 projects: [],
                 statusBreakdown: {}
               };
@@ -189,7 +112,6 @@ app.get('/api/pe-stats', async (req, res) => {
             
             peStats[peName].projectCount++;
             peStats[peName].workload += projectWorkload;
-            peStats[peName].rawWorkload += difficultyWeight;
             peStats[peName].projects.push({
               name: projectName,
               status: customerStatus,
@@ -210,25 +132,8 @@ app.get('/api/pe-stats', async (req, res) => {
       });
     });
     
-    // Fetch avatars for all PEs
-    const statsArray = Object.values(peStats);
-    console.log(`Fetching avatars for ${statsArray.length} PEs...`);
-    await Promise.all(
-      statsArray.map(async (pe) => {
-        if (pe.id) {
-          try {
-            pe.avatar = await feishuApi.getUserAvatar(token, pe.id);
-            console.log(`Avatar for ${pe.name}: ${pe.avatar ? 'Found' : 'Not found'}`);
-          } catch (error) {
-            console.error(`Failed to fetch avatar for ${pe.name}:`, error.message);
-          }
-        } else {
-          console.log(`No user ID for ${pe.name}, skipping avatar fetch`);
-        }
-      })
-    );
-    
     // Sort by project count
+    const statsArray = Object.values(peStats);
     statsArray.sort((a, b) => b.projectCount - a.projectCount);
     
     // Convert status stats to array for charting
@@ -242,18 +147,9 @@ app.get('/api/pe-stats', async (req, res) => {
       totalPEs: statsArray.length,
       totalProjects: statsArray.reduce((sum, pe) => sum + pe.projectCount, 0),
       totalWorkload: statsArray.reduce((sum, pe) => sum + pe.workload, 0),
-      totalRawWorkload: statsArray.reduce((sum, pe) => sum + pe.rawWorkload, 0),
       peStats: statsArray,
       statusStats: statusArray,
-      lastSync: dataStore.lastSync,
-      appliedWeights: {
-        difficulty: {
-          '高难项目': difficultyWeights['高难项目'],
-          '中等项目': difficultyWeights['中等项目'],
-          '简单项目': difficultyWeights['简单项目']
-        },
-        statusMultipliers: statusMultipliers
-      }
+      lastSync: dataStore.lastSync
     });
   } catch (error) {
     console.error('Error generating PE stats:', error);
@@ -288,33 +184,6 @@ async function performSync() {
     // Get access token
     const token = await feishuApi.getAccessToken();
     
-    // Sync documents
-    const documentIds = process.env.FEISHU_DOCUMENT_IDS?.split(',').filter(id => id.trim());
-    if (documentIds && documentIds.length > 0) {
-      const documents = await Promise.all(
-        documentIds.map(id => feishuApi.getDocument(token, id.trim()))
-      );
-      dataStore.documents = documents.filter(doc => doc !== null);
-    }
-    
-    // Sync sheets
-    const sheetIds = process.env.FEISHU_SHEET_IDS?.split(',').filter(id => id.trim());
-    if (sheetIds && sheetIds.length > 0) {
-      const sheets = await Promise.all(
-        sheetIds.map(id => feishuApi.getSpreadsheet(token, id.trim()))
-      );
-      dataStore.sheets = sheets.filter(sheet => sheet !== null);
-    }
-    
-    // Sync wiki pages
-    const wikiIds = process.env.FEISHU_WIKI_IDS?.split(',').filter(id => id.trim());
-    if (wikiIds && wikiIds.length > 0) {
-      const wikis = await Promise.all(
-        wikiIds.map(id => feishuApi.getWikiPage(token, id.trim()))
-      );
-      dataStore.wikis = wikis.filter(wiki => wiki !== null);
-    }
-    
     // Sync bitables
     const bitableIds = process.env.FEISHU_BITABLE_IDS?.split(',').filter(id => id.trim());
     if (bitableIds && bitableIds.length > 0) {
@@ -330,7 +199,7 @@ async function performSync() {
     
     dataStore.lastSync = new Date().toISOString();
     console.log('Sync completed successfully');
-    console.log(`Documents: ${dataStore.documents.length}, Sheets: ${dataStore.sheets.length}, Wikis: ${dataStore.wikis.length}, Bitables: ${dataStore.bitables.length}`);
+    console.log(`Bitables: ${dataStore.bitables.length}`);
   } catch (error) {
     console.error('Error during sync:', error);
     throw error;

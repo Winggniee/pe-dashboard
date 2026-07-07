@@ -12,9 +12,6 @@ app.use(express.json());
 
 // In-memory data store
 let dataStore = {
-  documents: [],
-  sheets: [],
-  wikis: [],
   bitables: [],
   lastSync: null
 };
@@ -24,9 +21,6 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     lastSync: dataStore.lastSync,
-    documentsCount: dataStore.documents.length,
-    sheetsCount: dataStore.sheets.length,
-    wikisCount: dataStore.wikis.length,
     bitablesCount: dataStore.bitables.length
   });
 });
@@ -41,9 +35,6 @@ app.get('/api/pe-stats', async (req, res) => {
   try {
     const peStats = {};
     const statusStats = {};
-    
-    // Get access token for fetching user avatars
-    const token = await feishuApi.getAccessToken();
     
     // Get user-adjustable weights from query params (with defaults)
     const difficultyWeights = {
@@ -111,10 +102,8 @@ app.get('/api/pe-stats', async (req, res) => {
                 name: peName,
                 email: pe.email || '',
                 id: pe.id || '',
-                avatar: null,
                 projectCount: 0,
                 workload: 0,  // Total weighted workload score
-                rawWorkload: 0,  // Raw difficulty sum (for reference)
                 projects: [],
                 statusBreakdown: {}
               };
@@ -122,7 +111,6 @@ app.get('/api/pe-stats', async (req, res) => {
             
             peStats[peName].projectCount++;
             peStats[peName].workload += projectWorkload;
-            peStats[peName].rawWorkload += difficultyWeight;
             peStats[peName].projects.push({
               name: projectName,
               status: customerStatus,
@@ -158,18 +146,9 @@ app.get('/api/pe-stats', async (req, res) => {
       totalPEs: statsArray.length,
       totalProjects: statsArray.reduce((sum, pe) => sum + pe.projectCount, 0),
       totalWorkload: statsArray.reduce((sum, pe) => sum + pe.workload, 0),
-      totalRawWorkload: statsArray.reduce((sum, pe) => sum + pe.rawWorkload, 0),
       peStats: statsArray,
       statusStats: statusArray,
-      lastSync: dataStore.lastSync,
-      appliedWeights: {
-        difficulty: {
-          '高难项目': difficultyWeights['高难项目'],
-          '中等项目': difficultyWeights['中等项目'],
-          '简单项目': difficultyWeights['简单项目']
-        },
-        statusMultipliers: statusMultipliers
-      }
+      lastSync: dataStore.lastSync
     });
   } catch (error) {
     console.error('Error generating PE stats:', error);

@@ -1,16 +1,15 @@
-# 飞书数据同步仪表板
+# PE 项目工作负载看板
 
-一个显示飞书文档和表格数据并自动同步的网站应用。
+一个从飞书多维表格同步项目数据，并计算展示每位 PE（项目负责人）工作负载的看板应用。
 
 ## 功能特性
 
-- 📊 展示飞书电子表格数据
-- 📄 显示飞书文档内容
-- 📖 显示飞书 Wiki 页面
-- 🗂️ 展示飞书多维表格（Bitable）
-- 🔄 自动数据同步
-- 🎨 简洁响应式界面
-- ⚡ 实时更新
+- �️ 自动同步飞书多维表格（Bitable）数据
+- � 按客户状态分类的堆叠条形图
+- 🧮 可调节权重的工作负载计算（难度 × 客户状态）
+- � 团队人力分布（深度工作 / 半阻塞 / 空闲）
+- 🔄 自动数据同步（默认每 1 分钟）
+- 🎨 响应式界面
 
 ## 准备工作
 
@@ -26,10 +25,7 @@
 2. 创建新的自建应用
 3. 获取 App ID 和 App Secret
 4. 添加所需权限：
-   - `docx:document`（读取文档）
-   - `sheets:spreadsheet`（读取电子表格）
    - `bitable:app`（读取多维表格）
-   - `wiki:wiki`（读取 Wiki 页面）
 
 ### 2. 安装依赖
 
@@ -46,10 +42,7 @@ copy .env.example .env
 编辑 `.env` 文件，添加你的凭证：
 - `FEISHU_APP_ID`: 你的应用 ID
 - `FEISHU_APP_SECRET`: 你的应用密钥
-- `FEISHU_DOCUMENT_IDS`: 要同步的文档 ID，用逗号分隔
-- `FEISHU_SHEET_IDS`: 要同步的电子表格 ID，用逗号分隔
-- `FEISHU_WIKI_IDS`: 要同步的 Wiki 页面 ID，用逗号分隔
-- `FEISHU_BITABLE_IDS`: 要同步的多维表格 ID，用逗号分隔
+- `FEISHU_BITABLE_IDS`: 要同步的多维表格 ID，用逗号分隔（支持 `appToken` 或 `appToken:tableId` 格式）
 
 ### 4. 运行应用
 
@@ -60,26 +53,24 @@ npm run dev
 
 后端运行在 `http://localhost:3001`，前端运行在 `http://localhost:5173`
 
-## 如何获取文档/表格 ID
+## 如何获取多维表格 ID
 
-在飞书中打开文档或表格时，ID 就在 URL 中：
-- 文档：`https://example.feishu.cn/docx/[文档ID]`
-- 表格：`https://example.feishu.cn/sheets/[表格ID]`
-- Wiki：`https://example.feishu.cn/wiki/[WikiID]`
-- 多维表格：`https://example.feishu.cn/base/[多维表格ID]`
+在飞书中打开多维表格时，ID 就在 URL 中：
+`https://example.feishu.cn/base/[appToken]?table=[tableId]`
 
 ## 项目结构
 
 ```
 .
 ├── server/
-│   ├── index.js          # Express 服务器
+│   ├── index.js          # Express 服务器（本地开发）
 │   ├── feishuApi.js      # 飞书 API 集成
 │   └── syncService.js    # 数据同步服务
+├── api/
+│   └── index.js          # Vercel serverless 函数
 ├── client/
 │   ├── src/
 │   │   ├── App.jsx       # 主 React 组件
-│   │   ├── components/   # React 组件
 │   │   └── services/     # API 服务
 │   └── ...
 └── package.json
@@ -88,18 +79,17 @@ npm run dev
 ## API 接口
 
 - `GET /api/health` - 健康检查
-- `GET /api/documents` - 获取所有已同步文档
-- `GET /api/sheets` - 获取所有已同步表格
-- `GET /api/wikis` - 获取所有已同步 Wiki 页面
 - `GET /api/bitables` - 获取所有已同步多维表格
+- `GET /api/pe-stats` - 获取 PE 工作负载统计（支持权重参数）
 - `POST /api/sync` - 触发手动同步
 
 ## 技术栈
 
 - **后端**：Node.js、Express
-- **前端**：React、Vite
+- **前端**：React、Vite、Recharts
 - **样式**：CSS3
 - **API**：飞书开放平台 API
+- **部署**：Vercel
 
 ## 许可证
 

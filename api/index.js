@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const feishuApi = require('../server/feishuApi');
+const ganttService = require('../server/ganttService');
 
 const app = express();
 
@@ -153,6 +154,20 @@ app.get('/api/pe-stats', async (req, res) => {
   } catch (error) {
     console.error('Error generating PE stats:', error);
     res.status(500).json({ error: 'Failed to generate PE statistics' });
+  }
+});
+
+// PE 个人项目维度甘特图 data endpoint.
+// Reads exclusively from the dedicated 变更历史记录表 configured via
+// FEISHU_GANTT_WIKI_NODE / FEISHU_GANTT_TABLE_ID — independent of dataStore /
+// FEISHU_BITABLE_IDS used by the rest of the dashboard.
+app.get('/api/pe-gantt', async (req, res) => {
+  try {
+    const gantt = await ganttService.buildGanttData();
+    res.json(gantt);
+  } catch (error) {
+    console.error('Error generating Gantt data:', error);
+    res.status(500).json({ error: error.message || 'Failed to generate Gantt data' });
   }
 });
 

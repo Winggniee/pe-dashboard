@@ -137,6 +137,42 @@ body {
   background: #1b2330;
 }
 
+.view-switch {
+  display: flex;
+  gap: 0.25rem;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.view-switch-btn {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.view-switch-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.view-switch-btn.active {
+  background: #ffffff;
+  color: #274c77;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.dark-theme .view-switch-btn.active {
+  background: var(--dt-accent);
+  color: #ffffff;
+}
+
 .sync-button {
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(10px);

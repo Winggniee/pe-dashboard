@@ -10,6 +10,12 @@ const api = {
     return response.json();
   },
 
+  async getPEGantt() {
+    const response = await fetch(`${API_BASE}/pe-gantt`);
+    if (!response.ok) throw new Error('Failed to fetch PE Gantt data');
+    return response.json();
+  },
+
   async triggerSync() {
     const response = await fetch(`${API_BASE}/sync`, {
       method: 'POST',

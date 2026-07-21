@@ -4,10 +4,11 @@
 
 ## 功能特性
 
-- �️ 自动同步飞书多维表格（Bitable）数据
-- � 按客户状态分类的堆叠条形图
+- 🗂️ 自动同步飞书多维表格（Bitable）数据
+- 📊 按客户状态分类的堆叠条形图
 - 🧮 可调节权重的工作负载计算（难度 × 客户状态）
-- � 团队人力分布（深度工作 / 半阻塞 / 空闲）
+- 👥 团队人力分布（深度工作 / 半阻塞 / 空闲）
+- 📅 PE 个人项目维度甘特图（详见 [PE_GANTT_CHART.md](./PE_GANTT_CHART.md)）
 - 🔄 自动数据同步（默认每 1 分钟）
 - 🎨 响应式界面
 
@@ -81,6 +82,7 @@ npm run dev
 - `GET /api/health` - 健康检查
 - `GET /api/bitables` - 获取所有已同步多维表格
 - `GET /api/pe-stats` - 获取 PE 工作负载统计（支持权重参数）
+- `GET /api/pe-gantt` - 获取 PE 甘特图数据（独立数据源，详见 [PE_GANTT_CHART.md](./PE_GANTT_CHART.md)）
 - `POST /api/sync` - 触发手动同步
 
 ## 技术栈

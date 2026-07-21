@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import api from './services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
+import PEGanttChart from './components/PEGanttChart';
 
 // Dynamic color assignment
 const STATUS_COLORS = {};
@@ -79,6 +80,7 @@ function App() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('pe-dashboard-theme') === 'dark';
   });
+  const [view, setView] = useState('stats'); // 'stats' or 'gantt'
 
   useEffect(() => {
     localStorage.setItem('pe-dashboard-theme', darkMode ? 'dark' : 'light');
@@ -376,6 +378,20 @@ function App() {
         <div className="header-content">
           <h1>PE 项目统计看板</h1>
           <div className="header-actions">
+            <div className="view-switch">
+              <button
+                className={`view-switch-btn ${view === 'stats' ? 'active' : ''}`}
+                onClick={() => setView('stats')}
+              >
+                📊 统计看板
+              </button>
+              <button
+                className={`view-switch-btn ${view === 'gantt' ? 'active' : ''}`}
+                onClick={() => setView('gantt')}
+              >
+                📅 项目甘特图
+              </button>
+            </div>
             <button 
               className={`theme-switch ${darkMode ? 'is-dark' : ''}`}
               onClick={() => setDarkMode(!darkMode)}
@@ -436,7 +452,9 @@ function App() {
       )}
 
       <main className="content">
-        {peStats.length === 0 ? (
+        {view === 'gantt' ? (
+          <PEGanttChart />
+        ) : peStats.length === 0 ? (
           <div className="empty-state">
             <h2>暂无数据</h2>
             <p>请检查飞书多维表格配置</p>

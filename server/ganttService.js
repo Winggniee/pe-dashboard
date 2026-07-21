@@ -20,14 +20,14 @@
 // partway through (project reassignment), the event stream is split into separate
 // per-PE "runs", each producing its own bar under its own PE.
 //
-// 已流失/封号 are never rendered as their own colored/labeled segment — reaching
-// either status ends the project. The previous segment (if any) is closed at that
-// event's timestamp; if there is no previous segment (the very first known event
-// for a run is already 已流失/封号), a neutral "ended" segment is emitted instead
-// of fabricating a status.
+// 已流失/封号/项目暂停 are never rendered as their own colored/labeled segment —
+// reaching any of these statuses ends the project. The previous segment (if any)
+// is closed at that event's timestamp; if there is no previous segment (the very
+// first known event for a run is already one of these), a neutral "ended" segment
+// is emitted instead of fabricating a status.
 const feishuApi = require('./feishuApi');
 
-const CLOSED_STATUSES = ['已流失', '封号'];
+const CLOSED_STATUSES = ['已流失', '封号', '项目暂停'];
 const ENDED_STATUS = '__ended__';
 
 const CACHE_TTL_MS = 20000; // avoid re-fetching from Feishu on every client poll

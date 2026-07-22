@@ -17,6 +17,30 @@ let dataStore = {
   lastSync: null
 };
 
+// Vercel serverless functions don't share memory across invocations/instances —
+// a "cold" instance always starts with an empty dataStore. The module-level
+// performSync() call below fires on cold start, but if a request lands before
+// it finishes (or on a different instance that hasn't synced at all), the API
+// would return empty results. This tracks the in-flight sync promise so any
+// route can await it instead of assuming dataStore is already populated.
+let syncPromise = performSync().catch(err => {
+  console.error('Initial sync failed:', err);
+});
+
+// Ensures dataStore has data before answering a request. Cheap no-op once a
+// sync has completed and dataStore is populated; otherwise awaits the
+// in-flight sync (reusing the same promise so concurrent cold requests don't
+// each trigger their own redundant sync).
+async function ensureSynced() {
+  if (dataStore.bitables.length > 0) return;
+  if (!syncPromise) {
+    syncPromise = performSync().catch(err => {
+      console.error('On-demand sync failed:', err);
+    });
+  }
+  await syncPromise;
+}
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
@@ -27,13 +51,16 @@ app.get('/api/health', (req, res) => {
 });
 
 // Get all bitables
-app.get('/api/bitables', (req, res) => {
+app.get('/api/bitables', async (req, res) => {
+  await ensureSynced();
   res.json(dataStore.bitables);
 });
 
 // PE Statistics endpoint
 app.get('/api/pe-stats', async (req, res) => {
   try {
+    await ensureSynced();
+
     const peStats = {};
     const statusStats = {};
     
@@ -220,11 +247,6 @@ async function performSync() {
     throw error;
   }
 }
-
-// Initial sync
-performSync().catch(err => {
-  console.error('Initial sync failed:', err);
-});
 
 // Export for Vercel
 module.exports = app;

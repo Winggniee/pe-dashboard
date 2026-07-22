@@ -1,6 +1,39 @@
 # 📝 更新日志 (Changelog)
 
-## 最新更新 - 2025-06-25
+## 最新更新 - 2026-07-22
+
+### ✅ 扩大非活跃项目状态的过滤范围（柱状图/PE统计看板）
+
+**变更原因：**
+- 数据源表（"当前项目"、"2026"）中出现了更多表示"项目已结束/不再有效"的客户状态值，
+  但原有过滤逻辑只排除了 "封号" 和 "已流失" 这两个值，导致这些项目仍被计入统计和负载计算
+- 实际检查数据后发现同一概念在不同表里用了不同的确切字符串（"当前项目"表用 "客户封号"，
+  "2026"表用 "封号"），之前的过滤条件完全没有覆盖 "客户封号" 这个变体
+
+**具体变更：**
+
+1. **过滤条件从 2 个值扩大到 5 个值**：`封号`、`客户封号`、`已流失`、`项目暂停`、`已移交`
+   - `server/index.js` 和 `api/index.js`（Vercel serverless 入口）的 `/api/pe-stats`
+     路由都已同步更新，两处逻辑保持一致
+   - 沿用原有方式：完全跳过（`return`）符合以上任一状态的项目，不计入项目总数、
+     不计入负载、不出现在项目列表或状态分布图里
+
+2. **代码位置**：搜索 `INACTIVE_STATUSES` 常量即可找到这处逻辑（两个文件里变量名相同）
+
+**验证方式：**
+- 本地和生产环境（https://pe-dashboard-eight.vercel.app）均已用 `/api/pe-stats`
+  的 `statusStats` 字段确认这 5 个状态不再出现在返回结果里
+
+**影响：**
+- ✅ 柱状图和工作负载计算现在更准确地只反映真正活跃的项目
+- ✅ 与本项目另一个功能"PE甘特图"（见 `PE_GANTT_CHART.md`）的排除逻辑保持概念一致——
+  甘特图那边排除的 `CLOSED_STATUSES` 目前是 `已流失`/`封号`/`项目暂停`/`已移交`
+  （来自不同的数据源表，字段命名也不完全相同，两处是独立维护的，不共享代码，
+  但业务含义上应尽量保持同步；如果甘特图那边又加了新状态，记得检查这里是否也要加）
+
+---
+
+## 之前更新 - 2025-06-25
 
 ### ✅ 移除非活跃项目状态
 
@@ -66,10 +99,13 @@
 - `client/src/App.jsx` - 前端状态列表和设置面板
 - `CHANGELOG.md` - 本文件
 
-### 数据过滤实现：
+### 数据过滤实现（当前版本，2026-07-22 更新后）：
 ```javascript
-// Skip inactive projects
-if (customerStatus === '封号' || customerStatus === '已流失') {
+// Skip inactive/closed projects — 封号/客户封号 are the same concept with
+// two different exact strings used across tables ("当前项目" uses 客户封号,
+// "2026" uses 封号), so both are checked explicitly.
+const INACTIVE_STATUSES = ['封号', '客户封号', '已流失', '项目暂停', '已移交'];
+if (INACTIVE_STATUSES.includes(customerStatus)) {
   return; // Skip this project
 }
 ```

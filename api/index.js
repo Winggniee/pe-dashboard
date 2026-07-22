@@ -73,8 +73,11 @@ app.get('/api/pe-stats', async (req, res) => {
           const projectName = fields['项目名称'] || fields['项目'] || '未命名项目';
           const customerStatus = fields['客户状态'] || '未知状态';
           
-          // Skip inactive projects (封号 and 已流失)
-          if (customerStatus === '封号' || customerStatus === '已流失') {
+          // Skip inactive/closed projects — 封号/客户封号 are the same concept with
+          // two different exact strings used across tables ("当前项目" uses 客户封号,
+          // "2026" uses 封号), so both are checked explicitly.
+          const INACTIVE_STATUSES = ['封号', '客户封号', '已流失', '项目暂停', '已移交'];
+          if (INACTIVE_STATUSES.includes(customerStatus)) {
             return; // Skip this project
           }
           
